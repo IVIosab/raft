@@ -3,6 +3,7 @@ import time
 import grpc
 import raft_pb2 as pb2
 import raft_pb2_grpc as pb2_grpc
+from concurrent import futures
 import random
 
 DEBUG_MODE = True
@@ -20,6 +21,8 @@ class Handler(pb2_grpc.ServiceServicer):
         pass  
     
     def RequestVote(self, request, context):
+        global LEADER, VOTED_FOR, TERM
+        
         if DEBUG_MODE:
             print("Entered RequsetVote")
 
@@ -33,12 +36,10 @@ class Handler(pb2_grpc.ServiceServicer):
         #Conditions
         if candidate_term == TERM: #In the same term as me, we both are or were candidates
             #Leader is dead since we are in an election
-            global LEADER
             LEADER = -1
 
             if VOTED_FOR == -1: #Did not vote
                 #Vote for the requester
-                global VOTED_FOR
                 VOTED_FOR = candidate_id
                 reply = {"term": TERM, "result": True}
             else: #Already voted
@@ -46,16 +47,13 @@ class Handler(pb2_grpc.ServiceServicer):
                 reply = {"term": TERM, "result": False}
         elif candidate_term > TERM: #I am in an earlier term
             #Leader is dead since I am in an early term
-            global LEADER
             LEADER = -1
             
             #Update my term
-            global TERM
             TERM = candidate_term
 
             if VOTED_FOR == -1: #Did not vote
                 #Vote for the requester
-                global VOTED_FOR
                 VOTED_FOR = candidate_id
                 reply = {"term": TERM, "result": True}
             else: #Already voted 
@@ -67,6 +65,8 @@ class Handler(pb2_grpc.ServiceServicer):
         return pb2.TermResultMessage(**reply)
 
     def AppendEntries(self, request, context):
+        global LEADER, VOTED_FOR
+        
         if DEBUG_MODE:
             print("Entered AppendEntries")
             
@@ -80,7 +80,6 @@ class Handler(pb2_grpc.ServiceServicer):
         #Conditions
         if leader_term >= TERM: #Requester is in the same or an upcoming term
             #Requester is the Leader, and remove my vote since there is no election
-            global LEADER, VOTED_FOR
             LEADER = leader_id
             VOTED_FOR = -1
             reply = {"term": TERM, "result": True}
@@ -128,12 +127,23 @@ class Handler(pb2_grpc.ServiceServicer):
 def server():
     if DEBUG_MODE:
         print("Entered Server")
+    # server = grpc.server(futures.ThreadPoolExecutor(max_workers=20))
+    # server.add_insecure_port()
+    # server.start()
     
-    channel = grpc.insecure_channel()
-    stub = pb2_grpc.ServiceStub(channel)
 
+def configuration():
+    with open('Config.conf') as f:
+        global SERVERS_INFO
+        lines = f.readlines()
+        for line in lines:
+            parts = line.split()
+            id, address, port = parts[0], parts[1], parts[2]
+            SERVERS_INFO[id] = (address, port)
 
 if __name__ == "__main__":
     if DEBUG_MODE: 
         print("Hello There!")
+    configuration()
     server()
+    
