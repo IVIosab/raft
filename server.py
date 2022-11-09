@@ -11,7 +11,7 @@ DEBUG_MODE = True
 ID = sys.argv[1]
 SERVERS_INFO = {}
 SERVERS_STATUS = {}
-TIMER = random.randint(150,300)
+TIMER = random.uniform(0.150,0.300)
 TERM = 0
 LEADER = -1
 VOTED_FOR = -1
@@ -108,29 +108,63 @@ class Handler(pb2_grpc.ServiceServicer):
             print("Entered GetLeader")
 
         #Initialize reply
-        reply = {"leader": -1}
+        reply = {"leader": -1, "address": ""}
 
         #Conditions
         if LEADER != -1: #I have a leader
             #Return the leader
-            reply = {"leader": LEADER}
+            reply = {"leader": LEADER, "address": SERVERS_INFO[LEADER]}
         else: #I do not have a leader
             if VOTED_FOR != -1: #I already voted
                 #Return who i voted for 
-                reply = {"leader": VOTED_FOR}
+                reply = {"leader": VOTED_FOR, "address":SERVERS_INFO[VOTED_FOR]}
             else: #I Did not vote
                 #Return nothing
-                reply = {} 
-                #maybe we should return here with empty message ?
+                reply = {}
+                return pb2.EmptyMessage(**reply) 
         return pb2.LeaderMessage(**reply)
+
+def heartbeat(id, address, port):
+    x=0
+    #worker function for leader threads
+
+def request(id, address, port):
+    x=0
+    #worker function for candidate threads
+
+def leader():
+    x=0
+    #Send heartbeat to each server with threads
+
+def candidate():
+    x=0
+    #Send request vote to each server with threads 
 
 def server():
     if DEBUG_MODE:
         print("Entered Server")
-    # server = grpc.server(futures.ThreadPoolExecutor(max_workers=20))
-    # server.add_insecure_port()
-    # server.start()
-    
+    server = grpc.server(futures.ThreadPoolExecutor(max_workers=20))
+    pb2_grpc.add_ServiceServicer_to_server(Handler(), server)
+    server.add_insecure_port(f'{SERVERS_INFO[ID][0]}:{SERVERS_INFO[ID][1]}')
+    server.start()
+
+    while True:
+        try:
+            if LEADER == ID:
+                x = server.wait_for_termination(0.05)
+                if x:
+                    leader()
+            else: 
+                x = server.wait_for_termination(1)
+                if x:
+                    candidate()
+
+        except grpc.RpcError:
+            print("Unexpected Error")
+            sys.exit()
+        except KeyboardInterrupt:
+            print("Shutting Down")
+            sys.exit()
 
 def configuration():
     with open('Config.conf') as f:
