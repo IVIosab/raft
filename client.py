@@ -19,14 +19,31 @@ def connect(address, port):
 def get_leader():
     if DEBUG_MODE:
         print("Entered get_leader")
+    channel = grpc.insecure_channel(f'{SERVER_ADDRESS}:{SERVER_PORT}')
+    stub = pb2_grpc.ServiceStub(channel)
+    message = pb2.EmptyMessage()
+    response = stub.GetLeader(message)
+    if response:
+        leader = response.leader
+        leader_address = response.address
+        print(f'{leader} {leader_address}')
+    else:
+        print(f'Nothing')
 
 def suspend(period):
     if DEBUG_MODE: 
         print("Entered suspend")
+    channel = grpc.insecure_channel(f'{SERVER_ADDRESS}:{SERVER_PORT}')
+    stub = pb2_grpc.ServiceStub(channel)
+    message = pb2.PeriodMessage(period=period)
+    response = stub.Suspend(message)
+    print(f'Server slept for {period} seconds')
 
 def quit():
     if DEBUG_MODE: 
         print("Entered quit")
+    print("The client ends")
+    sys.exit()
 
 def client():
     if DEBUG_MODE: 
