@@ -20,6 +20,9 @@ class Handler(pb2_grpc.ServiceServicer):
         pass  
     
     def RequestVote(self, request, context):
+        if DEBUG_MODE:
+            print("Entered RequsetVote")
+
         #Request input
         candidate_term = request.term
         candidate_id = request.candidateId
@@ -64,6 +67,9 @@ class Handler(pb2_grpc.ServiceServicer):
         return pb2.TermResultMessage(**reply)
 
     def AppendEntries(self, request, context):
+        if DEBUG_MODE:
+            print("Entered AppendEntries")
+            
         #Request input
         leader_term = request.term
         leader_id = request.leaderId
@@ -84,17 +90,24 @@ class Handler(pb2_grpc.ServiceServicer):
         return pb2.TermResultMessage(**reply)
         
     def Suspend(self, request, context):
+        if DEBUG_MODE:
+            print("Entered Suspend")
+        
         #Request input
         period = request.period
         
         #Make the server sleep for {period} seconds
         time.sleep(period)
+        print(f'Sleeping for {period} seconds')
 
         #Return an empty reply
         reply = {}
         return pb2.EmptyMessage(**reply)
 
     def GetLeader(self, requset, context):
+        if DEBUG_MODE:
+            print("Entered GetLeader")
+
         #Initialize reply
         reply = {"leader": -1}
 
@@ -113,10 +126,14 @@ class Handler(pb2_grpc.ServiceServicer):
         return pb2.LeaderMessage(**reply)
 
 def server():
-    print("hello there")
+    if DEBUG_MODE:
+        print("Entered Server")
+    
     channel = grpc.insecure_channel()
     stub = pb2_grpc.ServiceStub(channel)
 
 
 if __name__ == "__main__":
+    if DEBUG_MODE: 
+        print("Hello There!")
     server()
