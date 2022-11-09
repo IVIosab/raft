@@ -26,4 +26,5 @@ message EmptyMessasge{}
 
 message LeaderMessage{
     int32 leader = 1;
+    string address = 2;
 }

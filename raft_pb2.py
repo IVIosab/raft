@@ -13,7 +13,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\nraft.proto\")\n\rTermIdMessage\x12\x0c\n\x04term\x18\x01 \x01(\x05\x12\n\n\x02id\x18\x02 \x01(\x05\"1\n\x11TermResultMessage\x12\x0c\n\x04term\x18\x01 \x01(\x05\x12\x0e\n\x06result\x18\x02 \x01(\x08\"\x1f\n\rPeriodMessage\x12\x0e\n\x06period\x18\x01 \x01(\x05\"\x0f\n\rEmptyMessasge\"\x1f\n\rLeaderMessage\x12\x0e\n\x06leader\x18\x01 \x01(\x05\x32\xc9\x01\n\x07Service\x12\x31\n\x0bRequestVote\x12\x0e.TermIdMessage\x1a\x12.TermResultMessage\x12\x33\n\rAppendEntries\x12\x0e.TermIdMessage\x1a\x12.TermResultMessage\x12)\n\x07Suspend\x12\x0e.PeriodMessage\x1a\x0e.EmptyMessasge\x12+\n\tGetLeader\x12\x0e.EmptyMessasge\x1a\x0e.LeaderMessageb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\nraft.proto\")\n\rTermIdMessage\x12\x0c\n\x04term\x18\x01 \x01(\x05\x12\n\n\x02id\x18\x02 \x01(\x05\"1\n\x11TermResultMessage\x12\x0c\n\x04term\x18\x01 \x01(\x05\x12\x0e\n\x06result\x18\x02 \x01(\x08\"\x1f\n\rPeriodMessage\x12\x0e\n\x06period\x18\x01 \x01(\x05\"\x0f\n\rEmptyMessasge\"0\n\rLeaderMessage\x12\x0e\n\x06leader\x18\x01 \x01(\x05\x12\x0f\n\x07\x61\x64\x64ress\x18\x02 \x01(\t2\xc9\x01\n\x07Service\x12\x31\n\x0bRequestVote\x12\x0e.TermIdMessage\x1a\x12.TermResultMessage\x12\x33\n\rAppendEntries\x12\x0e.TermIdMessage\x1a\x12.TermResultMessage\x12)\n\x07Suspend\x12\x0e.PeriodMessage\x1a\x0e.EmptyMessasge\x12+\n\tGetLeader\x12\x0e.EmptyMessasge\x1a\x0e.LeaderMessageb\x06proto3')
 
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, globals())
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'raft_pb2', globals())
@@ -29,7 +29,7 @@ if _descriptor._USE_C_DESCRIPTORS == False:
   _EMPTYMESSASGE._serialized_start=141
   _EMPTYMESSASGE._serialized_end=156
   _LEADERMESSAGE._serialized_start=158
-  _LEADERMESSAGE._serialized_end=189
-  _SERVICE._serialized_start=192
-  _SERVICE._serialized_end=393
+  _LEADERMESSAGE._serialized_end=206
+  _SERVICE._serialized_start=209
+  _SERVICE._serialized_end=410
 # @@protoc_insertion_point(module_scope)
