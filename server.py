@@ -46,12 +46,11 @@ class Handler(pb2_grpc.ServiceServicer):
             reply = {"term": TERM, "result": False}
         return pb2.TermResultMessage(**reply)
         
-
     def Suspend(self, request, context):
         period = request.period
         time.sleep(period)
         reply = {}
-        return pb2.EmptyMessage(reply)
+        return pb2.EmptyMessage(**reply)
 
     def GetLeader(self, requset, context):
         reply = {"leader": -1}
@@ -62,6 +61,7 @@ class Handler(pb2_grpc.ServiceServicer):
                 reply = {"leader": VOTED_FOR}
             else: 
                 reply = {"leader": -1} # TODO: Should return nothing not -1
+        return pb2.LeaderMessage(**reply)
 
 def server():
     print("hello there")
