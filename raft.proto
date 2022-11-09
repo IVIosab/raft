@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+
+service Service{
+    rpc RequestVote(TermIdMessage) returns (TermResultMessage);
+    rpc AppendEntries(TermIdMessage) returns (TermResultMessage);
+    rpc Suspend(PeriodMessage) returns (EmptyMessasge);
+    rpc GetLeader(EmptyMessasge) returns (LeaderMessage);
+}
+
+message TermIdMessage{
+    int32 term = 1;
+    int32 id = 2;
+}
+
+message TermResultMessage{
+    int32 term = 1;
+    bool result = 2;
+}
+
+message PeriodMessage{
+    int32 period = 1;
+}
+
+message EmptyMessasge{}
+
+message LeaderMessage{
+    int32 leader = 1;
+}
