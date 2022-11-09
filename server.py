@@ -1,6 +1,8 @@
 import sys
 import time
 import grpc
+import raft_pb2 as pb2
+import raft_pb2_grpc as pb2_grpc
 import random
 
 DEBUG_MODE = True
@@ -17,44 +19,55 @@ class Handler(pb2_grpc.ServiceServicer):
     def __init__(self, *args, **kwargs):
         pass  
     
-    def request_vote(self, request, context):
-        canditate_term = request.term
-        canditate_id = request.id
-        if canditate_term == TERM:
-            if not VOTED:
-                #return (my_term, true)
+    def RequestVote(self, request, context):
+        candidate_term = request.term
+        candidate_id = request.candidateid
+        reply = {"term": -1, "result": False}
+        if candidate_term == TERM:
+            if VOTED_FOR != -1:
+                reply = {"term": TERM, "result": True}
             else:
-                #return (my_term, false)
-        elif canditate_term > TERM:
+                reply = {"term": TERM, "result": False}
+        elif candidate_term > TERM:
             global TERM
-            TERM = canditate_term
-            #return(my_term, false)
+            TERM = candidate_term
+            reply = {"term": TERM, "result": False}
         else: 
-            #return(my_term, false)
+            reply = {"term": TERM, "result": False}
+        return pb2.TermResultMessage(**reply)
 
-    def append_entries(self, request, context):
+    def AppendEntries(self, request, context):
         leader_term = request.term
-        leader_id = request.id
+        leader_id = request.leaderid
+        reply = {"term": -1, "result": False}
         if leader_term >= TERM:
-            #return(my_term, true)
+            reply = {"term": TERM, "result": True}
         else:
-            #return(my_term, false)
+            reply = {"term": TERM, "result": False}
+        return pb2.TermResultMessage(**reply)
         
-    def suspend(self, request, context):
+
+    def Suspend(self, request, context):
         period = request.period
         time.sleep(period)
+        reply = {}
+        return pb2.EmptyMessage(reply)
 
-    def get_leader(self, requset, context):
+    def GetLeader(self, requset, context):
+        reply = {"leader": -1}
         if LEADER != -1:
-            #return LEADER
+            reply = {"leader": LEADER}
         else:
             if VOTED_FOR != -1:
-                #return VOTED_FOR
-            else 
-                #return nothing
+                reply = {"leader": VOTED_FOR}
+            else: 
+                reply = {"leader": -1} # TODO: Should return nothing not -1
 
 def server():
+    print("hello there")
+    channel = grpc.insecure_channel()
+    stub = pb2_grpc.ServiceStub(channel)
 
 
 if __name__ == "__main__":
-    print("hello there")
+    server()
