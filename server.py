@@ -18,6 +18,10 @@ TERM = 0
 LEADER = -1
 VOTED_FOR = -1
 
+MY_VOTES = 0
+ALIVE_SERVERS = 0
+
+
 
 class Handler(pb2_grpc.ServiceServicer):
     def __init__(self, *args, **kwargs):
@@ -68,7 +72,7 @@ class Handler(pb2_grpc.ServiceServicer):
         return pb2.TermResultMessage(**reply)
 
     def AppendEntries(self, request, context):
-        global LEADER, VOTED_FOR
+        global LEADER, VOTED_FOR, TERM
 
         if DEBUG_MODE:
             print("Entered AppendEntries")
@@ -85,6 +89,7 @@ class Handler(pb2_grpc.ServiceServicer):
             # Requester is the Leader, and remove my vote since there is no election
             LEADER = leader_id
             VOTED_FOR = -1
+            TERM = leader_term
             reply = {"term": TERM, "result": True}
         else:  # Requester is in an earlier term
             # Return false and my term to show requester that they are in an earlier term
@@ -128,38 +133,76 @@ class Handler(pb2_grpc.ServiceServicer):
         return pb2.LeaderMessage(**reply)
 
 
-# These functions are not calling the RPC methods right?
-def heartbeat(id, address, port):
-    x = 0
+def heartbeat(id, address, port): #send heartbeat to server {id}
+    global LEADER, VOTED_FOR, TERM 
+    channel = grpc.insecure_channel(f'{address}:{port}')
+    stub = pb2_grpc.ServiceStub(channel)
+    message = pb2.TermIdMessage(term=TERM, id=ID)
+    response = stub.AppendEntries(message)
+    reciever_term = response.term
+    reciever_result = response.result
+    if reciever_result == False:
+        VOTED_FOR = -1
+        LEADER = -1
+        TERM = reciever_term
 
 
-def request(id, address, port):
-    x = 0
-# worker function for candidate threads
+def request(id, address, port): #request vote from server {id} 
+    global LEADER, VOTED_FOR, TERM, MY_VOTES, ALIVE_SERVERS
+    channel = grpc.insecure_channel(f'{address}:{port}')
+    stub = pb2_grpc.ServiceStub(channel)
+    message = pb2.TermIdMessage(term=TERM, id=ID)
+    response = stub.RequestVote(message)
+    reciever_term = response.term
+    reciever_result = response.result
+    ALIVE_SERVERS = ALIVE_SERVERS +1
+    if reciever_result == False:
+        if reciever_term > TERM:
+            TERM = reciever_term
+            LEADER = -1
+            VOTED_FOR = -1
+    else:
+        MY_VOTES = MY_VOTES+1
 
 
 def leader():
+    global LEADER, VOTED_FOR
+    #redundancy just to make sure
+    LEADER = ID
+    VOTED_FOR = -1
+
     threads = []
     for k, v in SERVERS_INFO:
-        # will send vote to ourselves as well
+        if k==ID:
+            continue
         threads.append(Thread(target=heartbeat, args=(k, v[0], v[1])))
 
     for t in threads:
         t.start()
+    
 
 
-def candidate():
+def candidate(): #become a candidate
+    global TERM, VOTED_FOR, LEADER
+    #leader is dead 
+    LEADER = -1
+    #increment term
+    TERM = TERM+1
+    #vote for myself
+    VOTED_FOR = ID
+    
     threads = []
     for k, v in SERVERS_INFO:
-        # will request vote from ourselves
+        if k==ID: 
+            continue
+        
         threads.append(Thread(target=request, args=(k, v[0], v[1])))
 
+    # Send request vote to each server with threads
     for t in threads:
         t.start()
-    # Send request vote to each server with threads
+    
 
-
-# Isn't the server a server and a client ?
 def server():
     if DEBUG_MODE:
         print("Entered Server")
@@ -171,13 +214,11 @@ def server():
     while True:
         try:
             if LEADER == ID:
-                x = server.wait_for_termination(0.051)
+                x = server.wait_for_termination(0.050)
                 if x:
                     leader()
             else:
-                # Shouldn't we have here a stub to wait for append_entry_Request from the leader
-                # and a timeout for the response which is the difference betweeb our time out and 50? like request a heart beat?
-                x = server.wait_for_termination(1)
+                x = server.wait_for_termination(TIMER)
                 if x:
                     candidate()
 
