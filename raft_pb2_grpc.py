@@ -27,11 +27,11 @@ class ServiceStub(object):
         self.Suspend = channel.unary_unary(
                 '/Service/Suspend',
                 request_serializer=raft__pb2.PeriodMessage.SerializeToString,
-                response_deserializer=raft__pb2.EmptyMessasge.FromString,
+                response_deserializer=raft__pb2.EmptyMessage.FromString,
                 )
         self.GetLeader = channel.unary_unary(
                 '/Service/GetLeader',
-                request_serializer=raft__pb2.EmptyMessasge.SerializeToString,
+                request_serializer=raft__pb2.EmptyMessage.SerializeToString,
                 response_deserializer=raft__pb2.LeaderMessage.FromString,
                 )
 
@@ -79,11 +79,11 @@ def add_ServiceServicer_to_server(servicer, server):
             'Suspend': grpc.unary_unary_rpc_method_handler(
                     servicer.Suspend,
                     request_deserializer=raft__pb2.PeriodMessage.FromString,
-                    response_serializer=raft__pb2.EmptyMessasge.SerializeToString,
+                    response_serializer=raft__pb2.EmptyMessage.SerializeToString,
             ),
             'GetLeader': grpc.unary_unary_rpc_method_handler(
                     servicer.GetLeader,
-                    request_deserializer=raft__pb2.EmptyMessasge.FromString,
+                    request_deserializer=raft__pb2.EmptyMessage.FromString,
                     response_serializer=raft__pb2.LeaderMessage.SerializeToString,
             ),
     }
@@ -143,7 +143,7 @@ class Service(object):
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/Service/Suspend',
             raft__pb2.PeriodMessage.SerializeToString,
-            raft__pb2.EmptyMessasge.FromString,
+            raft__pb2.EmptyMessage.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
@@ -159,7 +159,7 @@ class Service(object):
             timeout=None,
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/Service/GetLeader',
-            raft__pb2.EmptyMessasge.SerializeToString,
+            raft__pb2.EmptyMessage.SerializeToString,
             raft__pb2.LeaderMessage.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)

@@ -4,8 +4,8 @@ syntax = "proto3";
 service Service{
     rpc RequestVote(TermIdMessage) returns (TermResultMessage);
     rpc AppendEntries(TermIdMessage) returns (TermResultMessage);
-    rpc Suspend(PeriodMessage) returns (EmptyMessasge);
-    rpc GetLeader(EmptyMessasge) returns (LeaderMessage);
+    rpc Suspend(PeriodMessage) returns (EmptyMessage);
+    rpc GetLeader(EmptyMessage) returns (LeaderMessage);
 }
 
 message TermIdMessage{
@@ -22,7 +22,7 @@ message PeriodMessage{
     int32 period = 1;
 }
 
-message EmptyMessasge{}
+message EmptyMessage{}
 
 message LeaderMessage{
     int32 leader = 1;
