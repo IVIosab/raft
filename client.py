@@ -3,27 +3,23 @@ import grpc
 import raft_pb2 as pb2
 import raft_pb2_grpc as pb2_grpc
 
-DEBUG_MODE = False
 SERVER_ADDRESS = -1
 SERVER_PORT = -1
 
 
 # "... You only specify the address of the node you will later connect to (using getleader/suspend commands). You should check availability of the given address only on getleader/suspend invocation." -Alexey Stepanov
 def connect(address, port):
-    if DEBUG_MODE:
-        print("Entered connect")
     global SERVER_ADDRESS, SERVER_PORT
     SERVER_ADDRESS = address
     SERVER_PORT = port
 
 
 def get_leader():
-    if DEBUG_MODE:
-        print("Entered get_leader")
+    channel = grpc.insecure_channel(f'{SERVER_ADDRESS}:{SERVER_PORT}')
+    stub = pb2_grpc.ServiceStub(channel)
+    message = pb2.EmptyMessage()
+    
     try: 
-        channel = grpc.insecure_channel(f'{SERVER_ADDRESS}:{SERVER_PORT}')
-        stub = pb2_grpc.ServiceStub(channel)
-        message = pb2.EmptyMessage()
         response = stub.GetLeader(message)
         if response:
             leader = response.leader
@@ -36,12 +32,11 @@ def get_leader():
 
 
 def suspend(period):
-    if DEBUG_MODE:
-        print("Entered suspend")
+    channel = grpc.insecure_channel(f'{SERVER_ADDRESS}:{SERVER_PORT}')
+    stub = pb2_grpc.ServiceStub(channel)
+    message = pb2.PeriodMessage(period=period)
+    
     try:
-        channel = grpc.insecure_channel(f'{SERVER_ADDRESS}:{SERVER_PORT}')
-        stub = pb2_grpc.ServiceStub(channel)
-        message = pb2.PeriodMessage(period=period)
         response = stub.Suspend(message)
         print(f'Server slept for {period} seconds')
     except grpc.RpcError:
@@ -49,15 +44,11 @@ def suspend(period):
 
 
 def quit():
-    if DEBUG_MODE:
-        print("Entered quit")
     print("The client ends")
     sys.exit()
 
 
 def client():
-    if DEBUG_MODE:
-        print("Entered client")
     print("The client starts")
     while True:
         try:
@@ -84,6 +75,4 @@ def client():
 
 
 if __name__ == "__main__":
-    if DEBUG_MODE:
-        print("Hello There!")
     client()
