@@ -3,7 +3,7 @@ import grpc
 import raft_pb2 as pb2
 import raft_pb2_grpc as pb2_grpc
 
-DEBUG_MODE = True
+DEBUG_MODE = False
 SERVER_ADDRESS = -1
 SERVER_PORT = -1
 
@@ -20,26 +20,32 @@ def connect(address, port):
 def get_leader():
     if DEBUG_MODE:
         print("Entered get_leader")
-    channel = grpc.insecure_channel(f'{SERVER_ADDRESS}:{SERVER_PORT}')
-    stub = pb2_grpc.ServiceStub(channel)
-    message = pb2.EmptyMessage()
-    response = stub.GetLeader(message)
-    if response:
-        leader = response.leader
-        leader_address = response.address
-        print(f'{leader} {leader_address}')
-    else:
-        print(f'Nothing')
+    try: 
+        channel = grpc.insecure_channel(f'{SERVER_ADDRESS}:{SERVER_PORT}')
+        stub = pb2_grpc.ServiceStub(channel)
+        message = pb2.EmptyMessage()
+        response = stub.GetLeader(message)
+        if response:
+            leader = response.leader
+            leader_address = response.address
+            print(f'{leader} {leader_address}')
+        else:
+            print(f'Nothing')
+    except grpc.RpcError:
+        print("Server is not avaliable")
 
 
 def suspend(period):
     if DEBUG_MODE:
         print("Entered suspend")
-    channel = grpc.insecure_channel(f'{SERVER_ADDRESS}:{SERVER_PORT}')
-    stub = pb2_grpc.ServiceStub(channel)
-    message = pb2.PeriodMessage(period=period)
-    response = stub.Suspend(message)
-    print(f'Server slept for {period} seconds')
+    try:
+        channel = grpc.insecure_channel(f'{SERVER_ADDRESS}:{SERVER_PORT}')
+        stub = pb2_grpc.ServiceStub(channel)
+        message = pb2.PeriodMessage(period=period)
+        response = stub.Suspend(message)
+        print(f'Server slept for {period} seconds')
+    except grpc.RpcError:
+        print("Server is not avaliable")
 
 
 def quit():
@@ -52,6 +58,7 @@ def quit():
 def client():
     if DEBUG_MODE:
         print("Entered client")
+    print("The client starts")
     while True:
         try:
             input_buffer = input("> ")
@@ -79,3 +86,4 @@ def client():
 if __name__ == "__main__":
     if DEBUG_MODE:
         print("Hello There!")
+    client()
