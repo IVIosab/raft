@@ -1,233 +1,289 @@
 import sys
-import time
-from threading import Thread
+import os
+from threading import Thread, Timer
+from concurrent import futures
+import random
 
 import grpc
 import raft_pb2 as pb2
 import raft_pb2_grpc as pb2_grpc
-from concurrent import futures
-import random
 
-DEBUG_MODE = True
-
-ID = sys.argv[1]
+ID = int(sys.argv[1])
 SERVERS_INFO = {}
-SERVERS_STATUS = {}
-TIMER = random.uniform(0.150, 0.300)
-TERM = 0
-LEADER = -1
-VOTED_FOR = -1
 
-MY_VOTES = 0
-ALIVE_SERVERS = 0
+class Server:
+    def __init__(self):
+        self.state = "F"
+        self.term = 0
+        self.id = ID
+        self.voted = False
+        self.leaderid = -1
+        self.sleep = False
+        self.timeout = None
+        self.timer = None
+        self.threads = []
+        self.votes = []
+        self.start()
+    
+    def start(self):
+        self.set_timeout()
+        self.timer = Timer(self.timeout, self.follower_action)
+        self.timer.start()
 
+    def set_timeout(self):
+        if self.sleep:
+            return
+        self.timeout = random.uniform(0.150,0.300)
 
+    def restart_timer(self, time, func):
+        if self.sleep:
+            return
+        self.timer.cancel()
+        self.timer = Timer(time, func)
+        self.timer.start()
 
-class Handler(pb2_grpc.ServiceServicer):
-    def __init__(self, *args, **kwargs):
-        pass
+    def update_state(self, state):
+        if self.sleep:
+            return
+        self.state = state
+    
+    def update_term(self, term):
+        if self.sleep:
+            return
+        self.voted= False
+        self.term = term
+
+    def follower_declaration(self):
+        if self.sleep:
+            return
+        self.update_state("F")
+        print(f'I am a follower. Term: {self.term}')
+        self.restart_timer(self.timeout,self.follower_action)
+
+    def follower_action(self):
+        if self.sleep or self.state!="F":
+            return
+        print('The leader is dead')
+        self.leaderid = -1
+        self.candidate_declaration()
+        
+    def candidate_declaration(self):
+        if self.sleep:
+            return
+        self.update_term(self.term+1)
+        self.update_state("C")
+        self.voted = True
+        self.leaderid = self.id
+        print(f'I am a candidate. Term: {self.term}')
+        self.restart_timer(self.timeout, self.candidate_action)
+        self.candidate_election()
+    
+    def candidate_election(self):
+        if self.sleep or self.state!="C":
+            return
+        self.votes = [0 for _ in range(len(SERVERS_INFO))]
+        self.threads = []
+        for k, v in SERVERS_INFO.items():
+            if k==ID: 
+                self.votes[k]=1
+                continue
+            self.threads.append(Thread(target=self.request, args=(k, v))) 
+        for t in self.threads:
+            t.start()
+
+    def candidate_action(self):
+        if self.sleep or self.state!="C":
+            return
+        for t in self.threads:
+            t.join(0)
+        
+        print("Votes recieved")
+
+        if sum(self.votes) > (len(self.votes)//2):
+            self.timeout = 0.050
+            self.leader_declaration()
+        else:
+            self.set_timeout()
+            self.follower_declaration()
+
+    def leader_declaration(self):
+        if self.sleep:
+            return
+        self.update_state("L")
+        print(f'I am a leader, Term: {self.term}')
+        self.leaderid = self.id
+        self.leader_action()
+        
+    def leader_action(self):
+        if self.sleep or self.state != "L":
+            return
+        self.threads = []
+        for k, v in SERVERS_INFO.items():
+            if k==ID:
+                continue
+            self.threads.append(Thread(target=self.heartbeat, args=(k, v))) 
+        for t in self.threads:
+            t.start()
+        self.restart_timer(self.timeout, self.leader_action)
+        
+        
+    def request(self, id, address):  
+        if self.sleep or self.state != "C":
+            return
+        
+        channel = grpc.insecure_channel(address)
+        stub = pb2_grpc.ServiceStub(channel)
+        message = pb2.TermIdMessage(term=int(self.term), id=int(self.id))
+        try:
+            response = stub.RequestVote(message)
+            reciever_term = response.term
+            reciever_result = response.result
+            if reciever_term > self.term:
+                self.update_term(reciever_term)
+                self.set_timeout()
+                self.follower_declaration()
+            elif reciever_result:
+                self.votes[id] = 1
+        except grpc.RpcError:
+            return
+
+    def heartbeat(self, id, address):
+        if self.sleep or (self.state != "L"):
+            return
+        
+        channel = grpc.insecure_channel(address)
+        stub = pb2_grpc.ServiceStub(channel)
+        message = pb2.TermIdMessage(term=int(self.term), id=int(self.id))
+        
+        try: 
+            response = stub.AppendEntries(message)
+            reciever_term = response.term
+            reciever_result = response.result
+            if reciever_term > self.term:
+                self.update_term(reciever_term)
+                self.set_timeout()
+                self.follower_declaration()
+        except grpc.RpcError:
+            return
+
+    
+    def wakeup(self):
+        self.sleep = False
+        if self.state == "L":
+            self.leader_action()
+        elif self.state == "C":
+            self.candidate_action()
+        else:
+            self.follower_action()
+
+class Handler(pb2_grpc.ServiceServicer, Server):
+    def __init__(self):
+        super().__init__()
 
     def RequestVote(self, request, context):
-        global LEADER, VOTED_FOR, TERM
-
-        if DEBUG_MODE:
-            print("Entered RequsetVote")
-
-        # Request input
+        print("Requesting")
+        if self.sleep:
+            context.set_details("Server suspended")
+            context.set_code(grpc.StatusCode.UNAVAILABLE)
+            return pb2.TermResultMessage()
         candidate_term = request.term
-        candidate_id = request.candidateId
-
-        # Initialize reply
+        candidate_id = request.id
         reply = {"term": -1, "result": False}
-
-        # Conditions
-        if candidate_term == TERM:  # In the same term as me, we both are or were candidates
-            # Leader is dead since we are in an election
-            LEADER = -1
-
-            if VOTED_FOR == -1:  # Did not vote
-                # Vote for the requester
-                VOTED_FOR = candidate_id
-                reply = {"term": TERM, "result": True}
-            else:  # Already voted
-                # Return false to show that i can't vote for the requester
-                reply = {"term": TERM, "result": False}
-        elif candidate_term > TERM:  # I am in an earlier term
-            # Leader is dead since I am in an early term
-            LEADER = -1
-
-            # Update my term
-            TERM = candidate_term
-
-            if VOTED_FOR == -1:  # Did not vote
-                # Vote for the requester
-                VOTED_FOR = candidate_id
-                reply = {"term": TERM, "result": True}
-            else:  # Already voted
-                # Return false to show that i can't vote for the requester
-                reply = {"term": TERM, "result": False}
+        
+        if candidate_term == self.term:  # In the same term as me, we both are or were candidates
+            if self.state == "L":
+                reply = {"term": int(self.term), "result": False}
+            elif self.state == "C":
+                reply = {"term": int(self.term), "result": False}
+            elif not self.voted:
+                self.voted = True
+                self.leaderid = candidate_id
+                reply = {"term": int(self.term), "result": True}
+            else:
+                reply = {"term": int(self.term), "result": False}
+        elif candidate_term > self.term:  # I am in an earlier term
+            self.update_state("F")
+            self.update_term(candidate_term)
+            self.leaderid = candidate_id 
+            self.voted = True 
+            reply = {"term": int(self.term), "result": True}
         else:  # Candidate is in an earlier term
-            # Return false and my term to show Candidate that he is in an earlier term
-            reply = {"term": TERM, "result": False}
+            reply = {"term": int(self.term), "result": False}
+        
+        if reply["result"]:
+            print(f'Voted for node {self.id}')         
         return pb2.TermResultMessage(**reply)
 
     def AppendEntries(self, request, context):
-        global LEADER, VOTED_FOR, TERM
-
-        if DEBUG_MODE:
-            print("Entered AppendEntries")
-
-        # Request input
+        print("Appending")
+        if self.sleep:
+            context.set_details("Server suspended")
+            context.set_code(grpc.StatusCode.UNAVAILABLE)
+            return pb2.TermResultMessage()
         leader_term = request.term
-        leader_id = request.leaderId
-
-        # Initialize reply
+        leader_id = request.id
         reply = {"term": -1, "result": False}
-
-        # Conditions
-        if leader_term >= TERM:  # Requester is in the same or an upcoming term
-            # Requester is the Leader, and remove my vote since there is no election
-            LEADER = leader_id
-            VOTED_FOR = -1
-            TERM = leader_term
-            reply = {"term": TERM, "result": True}
+        
+        if leader_term >= self.term:
+            self.update_state("F")
+            self.update_term(leader_term)
+            self.leaderid = leader_id
+            reply = {"term": int(self.term), "result": True}
         else:  # Requester is in an earlier term
-            # Return false and my term to show requester that they are in an earlier term
-            reply = {"term": TERM, "result": False}
+            reply = {"term": int(self.term), "result": False}
+        
         return pb2.TermResultMessage(**reply)
 
     def Suspend(self, request, context):
-        if DEBUG_MODE:
-            print("Entered Suspend")
-
-        # Request input
+        if self.sleep:
+            context.set_details("Server suspended")
+            context.set_code(grpc.StatusCode.UNAVAILABLE)
+            return pb2.EmptyMessage()
         period = request.period
-
-        # Make the server sleep for {period} seconds
-        time.sleep(period)
+        
+        print(f'Command from client: suspend {period}')
+        self.sleep = True
+        self.timer.cancel()
+        self.timer = Timer(period, self.wakeup)
+        self.timer.start()
         print(f'Sleeping for {period} seconds')
-
-        # Return an empty reply
+        
         reply = {}
         return pb2.EmptyMessage(**reply)
 
-    def GetLeader(self, requset, context):
-        if DEBUG_MODE:
-            print("Entered GetLeader")
-
-        # Initialize reply
+    def GetLeader(self, request, context):
+        if self.sleep:
+            context.set_details("Server suspended")
+            context.set_code(grpc.StatusCode.UNAVAILABLE)
+            return pb2.LeaderMessage()
         reply = {"leader": -1, "address": ""}
-
-        # Conditions
-        if LEADER != -1:  # I have a leader
-            # Return the leader
-            reply = {"leader": LEADER, "address": SERVERS_INFO[LEADER]}
+        
+        print(f'Command from client: getleader')
+        
+        if self.leaderid != -1:  # I have a leader
+            reply = {"leader": int(self.leaderid), "address": SERVERS_INFO[self.leaderid]}
         else:  # I do not have a leader
-            if VOTED_FOR != -1:  # I already voted
-                # Return who i voted for
-                reply = {"leader": VOTED_FOR, "address": SERVERS_INFO[VOTED_FOR]}
-            else:  # I Did not vote
-                # Return nothing
-                reply = {}
-                return pb2.EmptyMessage(**reply)
+            reply = {}
+            
         return pb2.LeaderMessage(**reply)
 
 
-def heartbeat(id, address, port): #send heartbeat to server {id}
-    global LEADER, VOTED_FOR, TERM 
-    channel = grpc.insecure_channel(f'{address}:{port}')
-    stub = pb2_grpc.ServiceStub(channel)
-    message = pb2.TermIdMessage(term=TERM, id=ID)
-    response = stub.AppendEntries(message)
-    reciever_term = response.term
-    reciever_result = response.result
-    if reciever_result == False:
-        VOTED_FOR = -1
-        LEADER = -1
-        TERM = reciever_term
-
-
-def request(id, address, port): #request vote from server {id} 
-    global LEADER, VOTED_FOR, TERM, MY_VOTES, ALIVE_SERVERS
-    channel = grpc.insecure_channel(f'{address}:{port}')
-    stub = pb2_grpc.ServiceStub(channel)
-    message = pb2.TermIdMessage(term=TERM, id=ID)
-    response = stub.RequestVote(message)
-    reciever_term = response.term
-    reciever_result = response.result
-    ALIVE_SERVERS = ALIVE_SERVERS +1
-    if reciever_result == False:
-        if reciever_term > TERM:
-            TERM = reciever_term
-            LEADER = -1
-            VOTED_FOR = -1
-    else:
-        MY_VOTES = MY_VOTES+1
-
-
-def leader():
-    global LEADER, VOTED_FOR
-    #redundancy just to make sure
-    LEADER = ID
-    VOTED_FOR = -1
-
-    threads = []
-    for k, v in SERVERS_INFO:
-        if k==ID:
-            continue
-        threads.append(Thread(target=heartbeat, args=(k, v[0], v[1])))
-
-    for t in threads:
-        t.start()
-    
-
-
-def candidate(): #become a candidate
-    global TERM, VOTED_FOR, LEADER
-    #leader is dead 
-    LEADER = -1
-    #increment term
-    TERM = TERM+1
-    #vote for myself
-    VOTED_FOR = ID
-    
-    threads = []
-    for k, v in SERVERS_INFO:
-        if k==ID: 
-            continue
-        
-        threads.append(Thread(target=request, args=(k, v[0], v[1])))
-
-    # Send request vote to each server with threads
-    for t in threads:
-        t.start()
-    
-
-def server():
-    if DEBUG_MODE:
-        print("Entered Server")
-    server = grpc.server(futures.ThreadPoolExecutor(max_workers=20))
+def serve():
+    print(f'The server starts at {SERVERS_INFO[ID]}')
+    server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     pb2_grpc.add_ServiceServicer_to_server(Handler(), server)
-    server.add_insecure_port(f'{SERVERS_INFO[ID][0]}:{SERVERS_INFO[ID][1]}')
-    server.start()
-
-    while True:
-        try:
-            if LEADER == ID:
-                x = server.wait_for_termination(0.050)
-                if x:
-                    leader()
-            else:
-                x = server.wait_for_termination(TIMER)
-                if x:
-                    candidate()
-
-        except grpc.RpcError:
-            print("Unexpected Error")
-            sys.exit()
-        except KeyboardInterrupt:
-            print("Shutting Down")
-            sys.exit()
+    server.add_insecure_port(SERVERS_INFO[ID])
+    try:
+        server.start()
+        while True:
+            server.wait_for_termination()
+    except grpc.RpcError:
+        print("Unexpected Error")
+        os._exit(0)
+    except KeyboardInterrupt:
+        print("Shutting Down")
+        os._exit(0)
+        
 
 
 def configuration():
@@ -237,11 +293,12 @@ def configuration():
         for line in lines:
             parts = line.split()
             id, address, port = parts[0], parts[1], parts[2]
-            SERVERS_INFO[id] = (address, port)
+            SERVERS_INFO[int(id)] = (f'{str(address)}:{str(port)}')
+
+def run():  
+    configuration()
+    serve()
 
 
 if __name__ == "__main__":
-    if DEBUG_MODE:
-        print("Hello There!")
-    configuration()
-    server()
+    run()
