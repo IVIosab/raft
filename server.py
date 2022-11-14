@@ -36,12 +36,10 @@ class Server:
         self.timeout = random.uniform(0.150,0.300)
 
     def restart_timer(self, time, func):
-        if self.sleep:
-            return
         self.timer.cancel()
         self.timer = Timer(time, func)
         self.timer.start()
-
+        
     def update_state(self, state):
         if self.sleep:
             return
@@ -166,6 +164,9 @@ class Server:
         except grpc.RpcError:
             return
 
+    def gotosleep(self, period):
+        self.sleep = True
+        self.restart_timer(int(period), self.wakeup)
     
     def wakeup(self):
         self.sleep = False
@@ -181,7 +182,6 @@ class Handler(pb2_grpc.ServiceServicer, Server):
         super().__init__()
 
     def RequestVote(self, request, context):
-        print("Requesting")
         if self.sleep:
             context.set_details("Server suspended")
             context.set_code(grpc.StatusCode.UNAVAILABLE)
@@ -191,14 +191,14 @@ class Handler(pb2_grpc.ServiceServicer, Server):
         reply = {"term": -1, "result": False}
         
         if candidate_term == self.term:  # In the same term as me, we both are or were candidates
-            if self.state == "L":
-                reply = {"term": int(self.term), "result": False}
-            elif self.state == "C":
-                reply = {"term": int(self.term), "result": False}
-            elif not self.voted:
-                self.voted = True
-                self.leaderid = candidate_id
-                reply = {"term": int(self.term), "result": True}
+            if self.state == "F":
+                if not self.voted:
+                    self.voted = True
+                    self.leaderid = candidate_id
+                    reply = {"term": int(self.term), "result": True}
+                else:
+                    reply = {"term": int(self.term), "result": False}
+                self.restart_timer(self.timeout, self.follower_action)    
             else:
                 reply = {"term": int(self.term), "result": False}
         elif candidate_term > self.term:  # I am in an earlier term
@@ -207,15 +207,17 @@ class Handler(pb2_grpc.ServiceServicer, Server):
             self.leaderid = candidate_id 
             self.voted = True 
             reply = {"term": int(self.term), "result": True}
+            self.restart_timer(self.timeout, self.follower_action)
         else:  # Candidate is in an earlier term
             reply = {"term": int(self.term), "result": False}
-        
+            if self.state == "F":
+                self.restart_timer(self.timeout, self.follower_action)    
+            
         if reply["result"]:
             print(f'Voted for node {self.id}')         
         return pb2.TermResultMessage(**reply)
 
     def AppendEntries(self, request, context):
-        print("Appending")
         if self.sleep:
             context.set_details("Server suspended")
             context.set_code(grpc.StatusCode.UNAVAILABLE)
@@ -232,6 +234,9 @@ class Handler(pb2_grpc.ServiceServicer, Server):
         else:  # Requester is in an earlier term
             reply = {"term": int(self.term), "result": False}
         
+        if self.state == "F":
+            self.restart_timer(self.timeout, self.follower_action)
+        
         return pb2.TermResultMessage(**reply)
 
     def Suspend(self, request, context):
@@ -242,10 +247,7 @@ class Handler(pb2_grpc.ServiceServicer, Server):
         period = request.period
         
         print(f'Command from client: suspend {period}')
-        self.sleep = True
-        self.timer.cancel()
-        self.timer = Timer(period, self.wakeup)
-        self.timer.start()
+        self.gotosleep(period)
         print(f'Sleeping for {period} seconds')
         
         reply = {}
