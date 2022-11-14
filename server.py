@@ -20,15 +20,14 @@ class Server:
         self.leaderid = -1
         self.sleep = False
         self.timeout = None
-        self.timer = None
+        self.timer = Timer(10, self.start)
         self.threads = []
         self.votes = []
         self.start()
     
     def start(self):
         self.set_timeout()
-        self.timer = Timer(self.timeout, self.follower_action)
-        self.timer.start()
+        self.follower_declaration()
 
     def set_timeout(self):
         if self.sleep:
@@ -73,6 +72,7 @@ class Server:
         self.voted = True
         self.leaderid = self.id
         print(f'I am a candidate. Term: {self.term}')
+        print(f'Voted for node {self.id}')
         self.restart_timer(self.timeout, self.candidate_action)
         self.candidate_election()
     
@@ -195,6 +195,7 @@ class Handler(pb2_grpc.ServiceServicer, Server):
                 if not self.voted:
                     self.voted = True
                     self.leaderid = candidate_id
+                    print(f'Voted for node {candidate_id}')
                     reply = {"term": int(self.term), "result": True}
                 else:
                     reply = {"term": int(self.term), "result": False}
@@ -202,19 +203,17 @@ class Handler(pb2_grpc.ServiceServicer, Server):
             else:
                 reply = {"term": int(self.term), "result": False}
         elif candidate_term > self.term:  # I am in an earlier term
-            self.update_state("F")
             self.update_term(candidate_term)
             self.leaderid = candidate_id 
             self.voted = True 
+            print(f'Voted for node {candidate_id}')
             reply = {"term": int(self.term), "result": True}
-            self.restart_timer(self.timeout, self.follower_action)
+            self.follower_declaration()
         else:  # Candidate is in an earlier term
             reply = {"term": int(self.term), "result": False}
             if self.state == "F":
                 self.restart_timer(self.timeout, self.follower_action)    
-            
-        if reply["result"]:
-            print(f'Voted for node {self.id}')         
+                     
         return pb2.TermResultMessage(**reply)
 
     def AppendEntries(self, request, context):
@@ -227,10 +226,10 @@ class Handler(pb2_grpc.ServiceServicer, Server):
         reply = {"term": -1, "result": False}
         
         if leader_term >= self.term:
-            self.update_state("F")
             self.update_term(leader_term)
             self.leaderid = leader_id
             reply = {"term": int(self.term), "result": True}
+            self.follower_declaration
         else:  # Requester is in an earlier term
             reply = {"term": int(self.term), "result": False}
         
@@ -264,6 +263,7 @@ class Handler(pb2_grpc.ServiceServicer, Server):
         
         if self.leaderid != -1:  # I have a leader
             reply = {"leader": int(self.leaderid), "address": SERVERS_INFO[self.leaderid]}
+            print(f'{int(self.leaderid)} {SERVERS_INFO[self.leaderid]}')
         else:  # I do not have a leader
             reply = {}
             
