@@ -19,7 +19,7 @@ def get_leader():
     stub = pb2_grpc.ServiceStub(channel)
     message = pb2.EmptyMessage()
     
-    try: 
+    try:
         response = stub.GetLeader(message)
         if response:
             leader = response.leader
@@ -29,8 +29,7 @@ def get_leader():
             print(f'Nothing')
     except grpc.RpcError:
         print("Server is not avaliable")
-
-
+    
 def suspend(period):
     channel = grpc.insecure_channel(f'{SERVER_ADDRESS}:{SERVER_PORT}')
     stub = pb2_grpc.ServiceStub(channel)
