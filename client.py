@@ -37,7 +37,6 @@ def suspend(period):
     
     try:
         response = stub.Suspend(message)
-        print(f'Server slept for {period} seconds')
     except grpc.RpcError:
         print("Server is not avaliable")
 
@@ -65,8 +64,7 @@ def client():
             elif command == "suspend":
                 suspend(int(command_args[0]))
             elif command == "quit":
-                print("Shutting Down")
-                sys.exit()
+                quit()
             else:
                 print(f'command: {command}, is not supported')
         except KeyboardInterrupt:
