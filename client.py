@@ -13,7 +13,6 @@ def connect(address, port):
     SERVER_ADDRESS = address
     SERVER_PORT = port
 
-
 def get_leader():
     channel = grpc.insecure_channel(f'{SERVER_ADDRESS}:{SERVER_PORT}')
     stub = pb2_grpc.ServiceStub(channel)
@@ -29,7 +28,7 @@ def get_leader():
             print(f'Nothing')
     except grpc.RpcError:
         print("Server is not avaliable")
-    
+
 def suspend(period):
     channel = grpc.insecure_channel(f'{SERVER_ADDRESS}:{SERVER_PORT}')
     stub = pb2_grpc.ServiceStub(channel)
@@ -72,7 +71,6 @@ def quit():
     print("The client ends")
     sys.exit()
 
-
 def client():
     print("The client starts")
     while True:
@@ -100,7 +98,6 @@ def client():
                 print(f'command: {command}, is not supported')
         except KeyboardInterrupt:
             sys.exit()
-
 
 if __name__ == "__main__":
     client()
