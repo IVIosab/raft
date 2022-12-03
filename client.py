@@ -40,6 +40,33 @@ def suspend(period):
     except grpc.RpcError:
         print("Server is not avaliable")
 
+def getVal(key):
+    channel = grpc.insecure_channel(f'{SERVER_ADDRESS}:{SERVER_PORT}')
+    stub = pb2_grpc.ServiceStub(channel)
+    message = pb2.KeyMessage(key=key)
+    
+    try:
+        response = stub.GetVal(message)
+        if response.success:
+            print(response.value)
+        else:
+            print("Something went wrong")
+    except grpc.RpcError:
+        print("Server is not avaliable")
+
+def setVal(key, value):
+    channel = grpc.insecure_channel(f'{SERVER_ADDRESS}:{SERVER_PORT}')
+    stub = pb2_grpc.ServiceStub(channel)
+    message = pb2.KeyValMessage(key=key, value=value)
+    
+    try:
+        response = stub.SetVal(message)
+        if response.success:
+            print("Success")
+        else:
+            print("Something went wrong")
+    except grpc.RpcError:
+        print("Server is not available")
 
 def quit():
     print("The client ends")
@@ -65,6 +92,10 @@ def client():
                 suspend(int(command_args[0]))
             elif command == "quit":
                 quit()
+            elif command == "getval":
+                getVal(command_args[0])
+            elif command == "setval":
+                setVal(command_args[0], command_args[1])
             else:
                 print(f'command: {command}, is not supported')
         except KeyboardInterrupt:
