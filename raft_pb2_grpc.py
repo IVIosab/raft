@@ -16,12 +16,12 @@ class ServiceStub(object):
         """
         self.RequestVote = channel.unary_unary(
                 '/Service/RequestVote',
-                request_serializer=raft__pb2.TermIdMessage.SerializeToString,
+                request_serializer=raft__pb2.RequestTermIdMessage.SerializeToString,
                 response_deserializer=raft__pb2.TermResultMessage.FromString,
                 )
         self.AppendEntries = channel.unary_unary(
                 '/Service/AppendEntries',
-                request_serializer=raft__pb2.TermIdMessage.SerializeToString,
+                request_serializer=raft__pb2.AppendTermIdMessage.SerializeToString,
                 response_deserializer=raft__pb2.TermResultMessage.FromString,
                 )
         self.Suspend = channel.unary_unary(
@@ -90,12 +90,12 @@ def add_ServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
             'RequestVote': grpc.unary_unary_rpc_method_handler(
                     servicer.RequestVote,
-                    request_deserializer=raft__pb2.TermIdMessage.FromString,
+                    request_deserializer=raft__pb2.RequestTermIdMessage.FromString,
                     response_serializer=raft__pb2.TermResultMessage.SerializeToString,
             ),
             'AppendEntries': grpc.unary_unary_rpc_method_handler(
                     servicer.AppendEntries,
-                    request_deserializer=raft__pb2.TermIdMessage.FromString,
+                    request_deserializer=raft__pb2.AppendTermIdMessage.FromString,
                     response_serializer=raft__pb2.TermResultMessage.SerializeToString,
             ),
             'Suspend': grpc.unary_unary_rpc_method_handler(
@@ -140,7 +140,7 @@ class Service(object):
             timeout=None,
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/Service/RequestVote',
-            raft__pb2.TermIdMessage.SerializeToString,
+            raft__pb2.RequestTermIdMessage.SerializeToString,
             raft__pb2.TermResultMessage.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
@@ -157,7 +157,7 @@ class Service(object):
             timeout=None,
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/Service/AppendEntries',
-            raft__pb2.TermIdMessage.SerializeToString,
+            raft__pb2.AppendTermIdMessage.SerializeToString,
             raft__pb2.TermResultMessage.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)

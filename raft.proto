@@ -1,8 +1,8 @@
 syntax = "proto3";
 
 service Service{
-    rpc RequestVote(TermIdMessage) returns (TermResultMessage);
-    rpc AppendEntries(TermIdMessage) returns (TermResultMessage);
+    rpc RequestVote(RequestTermIdMessage) returns (TermResultMessage);
+    rpc AppendEntries(AppendTermIdMessage) returns (TermResultMessage);
     rpc Suspend(PeriodMessage) returns (EmptyMessage);
     rpc GetLeader(EmptyMessage) returns (LeaderMessage);
     rpc SetVal(KeyValMessage) returns (SuccessMessage);
@@ -10,7 +10,7 @@ service Service{
 }
 
 message KeyValMessage{
-    int32 key = 1;
+    string key = 1;
     string value = 2;
 }
 
@@ -19,7 +19,7 @@ message SuccessMessage{
 }
 
 message KeyMessage{
-    int32 key = 1;
+    string key = 1;
 }
 
 message SuccessValMessage{
@@ -27,9 +27,24 @@ message SuccessValMessage{
     string value = 2;
 }
 
-message TermIdMessage{
+message RequestTermIdMessage{
     int32 term = 1;
     int32 id = 2;
+    int32 last_log_index = 3;
+    int32 last_log_term = 4;
+}
+
+message Entry{
+    map<string,string> entry = 1;
+}
+
+message AppendTermIdMessage{
+    int32 term = 1;
+    int32 id = 2;
+    int32 prev_log_index = 3;
+    int32 prev_log_term = 4;
+    repeated Entry entries = 5;
+    int32 leader_commit = 6;
 }
 
 message TermResultMessage{
