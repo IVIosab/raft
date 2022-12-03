@@ -34,6 +34,16 @@ class ServiceStub(object):
                 request_serializer=raft__pb2.EmptyMessage.SerializeToString,
                 response_deserializer=raft__pb2.LeaderMessage.FromString,
                 )
+        self.SetVal = channel.unary_unary(
+                '/Service/SetVal',
+                request_serializer=raft__pb2.KeyValMessage.SerializeToString,
+                response_deserializer=raft__pb2.SuccessMessage.FromString,
+                )
+        self.GetVal = channel.unary_unary(
+                '/Service/GetVal',
+                request_serializer=raft__pb2.KeyMessage.SerializeToString,
+                response_deserializer=raft__pb2.SuccessValMessage.FromString,
+                )
 
 
 class ServiceServicer(object):
@@ -63,6 +73,18 @@ class ServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def SetVal(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetVal(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_ServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -85,6 +107,16 @@ def add_ServiceServicer_to_server(servicer, server):
                     servicer.GetLeader,
                     request_deserializer=raft__pb2.EmptyMessage.FromString,
                     response_serializer=raft__pb2.LeaderMessage.SerializeToString,
+            ),
+            'SetVal': grpc.unary_unary_rpc_method_handler(
+                    servicer.SetVal,
+                    request_deserializer=raft__pb2.KeyValMessage.FromString,
+                    response_serializer=raft__pb2.SuccessMessage.SerializeToString,
+            ),
+            'GetVal': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetVal,
+                    request_deserializer=raft__pb2.KeyMessage.FromString,
+                    response_serializer=raft__pb2.SuccessValMessage.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -161,5 +193,39 @@ class Service(object):
         return grpc.experimental.unary_unary(request, target, '/Service/GetLeader',
             raft__pb2.EmptyMessage.SerializeToString,
             raft__pb2.LeaderMessage.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def SetVal(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/Service/SetVal',
+            raft__pb2.KeyValMessage.SerializeToString,
+            raft__pb2.SuccessMessage.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def GetVal(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/Service/GetVal',
+            raft__pb2.KeyMessage.SerializeToString,
+            raft__pb2.SuccessValMessage.FromString,
             options, channel_credentials,
             insecure, call_credentials, compression, wait_for_ready, timeout, metadata)

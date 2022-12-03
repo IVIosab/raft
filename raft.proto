@@ -1,11 +1,30 @@
 syntax = "proto3";
 
-
 service Service{
     rpc RequestVote(TermIdMessage) returns (TermResultMessage);
     rpc AppendEntries(TermIdMessage) returns (TermResultMessage);
     rpc Suspend(PeriodMessage) returns (EmptyMessage);
     rpc GetLeader(EmptyMessage) returns (LeaderMessage);
+    rpc SetVal(KeyValMessage) returns (SuccessMessage);
+    rpc GetVal(KeyMessage) returns (SuccessValMessage);
+}
+
+message KeyValMessage{
+    int32 key = 1;
+    string value = 2;
+}
+
+message SuccessMessage{
+    bool success = 1;
+}
+
+message KeyMessage{
+    int32 key = 1;
+}
+
+message SuccessValMessage{
+    bool success = 1;
+    string value = 2;
 }
 
 message TermIdMessage{

@@ -13,23 +13,31 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\nraft.proto\")\n\rTermIdMessage\x12\x0c\n\x04term\x18\x01 \x01(\x05\x12\n\n\x02id\x18\x02 \x01(\x05\"1\n\x11TermResultMessage\x12\x0c\n\x04term\x18\x01 \x01(\x05\x12\x0e\n\x06result\x18\x02 \x01(\x08\"\x1f\n\rPeriodMessage\x12\x0e\n\x06period\x18\x01 \x01(\x05\"\x0e\n\x0c\x45mptyMessage\"0\n\rLeaderMessage\x12\x0e\n\x06leader\x18\x01 \x01(\x05\x12\x0f\n\x07\x61\x64\x64ress\x18\x02 \x01(\t2\xc7\x01\n\x07Service\x12\x31\n\x0bRequestVote\x12\x0e.TermIdMessage\x1a\x12.TermResultMessage\x12\x33\n\rAppendEntries\x12\x0e.TermIdMessage\x1a\x12.TermResultMessage\x12(\n\x07Suspend\x12\x0e.PeriodMessage\x1a\r.EmptyMessage\x12*\n\tGetLeader\x12\r.EmptyMessage\x1a\x0e.LeaderMessageb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\nraft.proto\"+\n\rKeyValMessage\x12\x0b\n\x03key\x18\x01 \x01(\x05\x12\r\n\x05value\x18\x02 \x01(\t\"!\n\x0eSuccessMessage\x12\x0f\n\x07success\x18\x01 \x01(\x08\"\x19\n\nKeyMessage\x12\x0b\n\x03key\x18\x01 \x01(\x05\"3\n\x11SuccessValMessage\x12\x0f\n\x07success\x18\x01 \x01(\x08\x12\r\n\x05value\x18\x02 \x01(\t\")\n\rTermIdMessage\x12\x0c\n\x04term\x18\x01 \x01(\x05\x12\n\n\x02id\x18\x02 \x01(\x05\"1\n\x11TermResultMessage\x12\x0c\n\x04term\x18\x01 \x01(\x05\x12\x0e\n\x06result\x18\x02 \x01(\x08\"\x1f\n\rPeriodMessage\x12\x0e\n\x06period\x18\x01 \x01(\x05\"\x0e\n\x0c\x45mptyMessage\"0\n\rLeaderMessage\x12\x0e\n\x06leader\x18\x01 \x01(\x05\x12\x0f\n\x07\x61\x64\x64ress\x18\x02 \x01(\t2\x9d\x02\n\x07Service\x12\x31\n\x0bRequestVote\x12\x0e.TermIdMessage\x1a\x12.TermResultMessage\x12\x33\n\rAppendEntries\x12\x0e.TermIdMessage\x1a\x12.TermResultMessage\x12(\n\x07Suspend\x12\x0e.PeriodMessage\x1a\r.EmptyMessage\x12*\n\tGetLeader\x12\r.EmptyMessage\x1a\x0e.LeaderMessage\x12)\n\x06SetVal\x12\x0e.KeyValMessage\x1a\x0f.SuccessMessage\x12)\n\x06GetVal\x12\x0b.KeyMessage\x1a\x12.SuccessValMessageb\x06proto3')
 
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, globals())
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'raft_pb2', globals())
 if _descriptor._USE_C_DESCRIPTORS == False:
 
   DESCRIPTOR._options = None
-  _TERMIDMESSAGE._serialized_start=14
-  _TERMIDMESSAGE._serialized_end=55
-  _TERMRESULTMESSAGE._serialized_start=57
-  _TERMRESULTMESSAGE._serialized_end=106
-  _PERIODMESSAGE._serialized_start=108
-  _PERIODMESSAGE._serialized_end=139
-  _EMPTYMESSAGE._serialized_start=141
-  _EMPTYMESSAGE._serialized_end=155
-  _LEADERMESSAGE._serialized_start=157
-  _LEADERMESSAGE._serialized_end=205
-  _SERVICE._serialized_start=208
-  _SERVICE._serialized_end=407
+  _KEYVALMESSAGE._serialized_start=14
+  _KEYVALMESSAGE._serialized_end=57
+  _SUCCESSMESSAGE._serialized_start=59
+  _SUCCESSMESSAGE._serialized_end=92
+  _KEYMESSAGE._serialized_start=94
+  _KEYMESSAGE._serialized_end=119
+  _SUCCESSVALMESSAGE._serialized_start=121
+  _SUCCESSVALMESSAGE._serialized_end=172
+  _TERMIDMESSAGE._serialized_start=174
+  _TERMIDMESSAGE._serialized_end=215
+  _TERMRESULTMESSAGE._serialized_start=217
+  _TERMRESULTMESSAGE._serialized_end=266
+  _PERIODMESSAGE._serialized_start=268
+  _PERIODMESSAGE._serialized_end=299
+  _EMPTYMESSAGE._serialized_start=301
+  _EMPTYMESSAGE._serialized_end=315
+  _LEADERMESSAGE._serialized_start=317
+  _LEADERMESSAGE._serialized_end=365
+  _SERVICE._serialized_start=368
+  _SERVICE._serialized_end=653
 # @@protoc_insertion_point(module_scope)
