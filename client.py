@@ -46,10 +46,7 @@ def getVal(key):
     
     try:
         response = stub.GetVal(message)
-        if response.success:
-            print(response.value)
-        else:
-            print("Something went wrong")
+        print(response.value)
     except grpc.RpcError:
         print("Server is not avaliable")
 
@@ -61,11 +58,20 @@ def setVal(key, value):
     try:
         response = stub.SetVal(message)
         if response.success:
-            print("Success")
+            pass
         else:
             print("Something went wrong")
     except grpc.RpcError:
         print("Server is not available")
+
+def check(intended_args, recieved_args):
+    if recieved_args<intended_args:
+        print("Not enouch arguments")
+        return True
+    elif recieved_args>intended_args:
+        print("Too many arguments")
+        return True
+    return False
 
 def quit():
     print("The client ends")
@@ -83,16 +89,28 @@ def client():
             command_args = input_buffer.split()[1:]  # command arguments
 
             if command == "connect":
+                if check(2, len(command_args)):
+                    continue
                 connect(str(command_args[0]), str(command_args[1]))
             elif command == "getleader":
+                if check(0, len(command_args)):
+                    continue
                 get_leader()
             elif command == "suspend":
+                if check(1, len(command_args)):
+                    continue
                 suspend(int(command_args[0]))
             elif command == "quit":
+                if check(0, len(command_args)):
+                    continue
                 quit()
             elif command == "getval":
+                if check(1, len(command_args)):
+                    continue
                 getVal(command_args[0])
             elif command == "setval":
+                if check(2, len(command_args)):
+                    continue
                 setVal(command_args[0], command_args[1])
             else:
                 print(f'command: {command}, is not supported')
