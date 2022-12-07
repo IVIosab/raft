@@ -34,8 +34,15 @@ message RequestTermIdMessage{
     int32 last_log_term = 4;
 }
 
+message Update{
+    string command = 1;
+    string key = 2;
+    string value = 3;
+}
+
 message Entry{
-    map<string,string> entry = 1;
+    int32 term = 1;
+    Update update = 2;
 }
 
 message AppendTermIdMessage{
