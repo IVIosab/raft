@@ -237,28 +237,20 @@ class Handler(pb2_grpc.ServiceServicer, Server):
         reply = {"term": -1, "result": False}
         
         if request.term == self.term:  # In the same term as me, we both are or were candidates
-            if self.state == "F":
-                if not self.voted:
-                    if request.last_log_index > len(self.log):
-                        self.voted = True
-                        self.leaderid = request.id
-                        print(f'Voted for node {request.id}')
-                        reply = {"term": int(self.term), "result": True}
-                    elif request.last_log_index == len(self.log):
-                        if self.log[request.last_log_index-1]["term"] == request.last_log_term:
-                            self.voted = True
-                            self.leaderid = request.id
-                            print(f'Voted for node {request.id}')
-                            reply = {"term": int(self.term), "result": True}
-                        else:
-                            reply = {"term": int(self.term), "result": False}    
-                    else:
-                        reply = {"term": int(self.term), "result": False}
-                else:
-                    reply = {"term": int(self.term), "result": False}
-                self.restart_timer(self.timeout, self.follower_action)    
-            else:
+            if self.voted or request.last_log_index < len(self.log) or self.state != "F":
                 reply = {"term": int(self.term), "result": False}
+            elif request.last_log_index == len(self.log):
+                if self.log[request.last_log_index-1]["term"] != request.last_log_term:
+                    reply = {"term": int(self.term), "result": False}
+            else:
+                self.voted = True
+                self.leaderid = request.id
+                print(f'Voted for node {request.id}')
+                reply = {"term": int(self.term), "result": True}    
+
+            if self.state == "F":
+                self.restart_timer(self.timeout, self.follower_action)
+        
         elif request.term > self.term:  # I am in an earlier term
             self.update_term(request.term)
             print(f'Voted for node {request.id}')
@@ -266,6 +258,7 @@ class Handler(pb2_grpc.ServiceServicer, Server):
             self.voted = True 
             self.follower_declaration()
             reply = {"term": int(self.term), "result": True}
+        
         else:  # Candidate is in an earlier term
             reply = {"term": int(self.term), "result": False}
             if self.state == "F":
@@ -279,45 +272,29 @@ class Handler(pb2_grpc.ServiceServicer, Server):
             context.set_code(grpc.StatusCode.UNAVAILABLE)
             return pb2.TermResultMessage()
         reply = {"term": -1, "result": False}
-        if request.term == self.term:
+        
+        if request.term >= self.term:
+            if request.term > self.term:
+                self.update_term(request.term)
+                self.follower_declaration
+                self.leaderid = request.id
+                
             if len(self.log) < request.prev_log_index:
-                #print("Test")
                 reply = {"term": int(self.term), "result": False}
                 if self.state == "F":
                     self.restart_timer(self.timeout, self.follower_action)    
+            
             else:
                 if len(self.log) > request.prev_log_index:
                     self.log = self.log[:request.prev_log_index]
+                
                 if len(request.entries) != 0 :
-                    self.log.append(request.entries[0])
+                    self.log.append({"term": request.entries[0].term, "update": {"command": request.entries[0].update.command, "key": request.entries[0].update.key, "value": request.entries[0].update.value}})
+                
                 if request.leader_commit > self.commitIndex:
                     self.commitIndex = min(request.leader_commit, len(self.log))
                     while self.commitIndex > self.lastApplied:
-                        key, value = self.log[self.lastApplied].update.key, self.log[self.lastApplied].update.value
-                        self.database[key] = value
-                        self.lastApplied+=1
-                            
-                reply = {"term": int(self.term), "result": True}    
-                self.restart_timer(self.timeout, self.follower_action)
-
-        elif request.term > self.term:
-            self.update_term(request.term)
-            self.follower_declaration
-            self.leaderid = request.id
-            if len(self.log) < request.prev_log_index:
-                #print("Test")
-                reply = {"term": int(self.term), "result": False}
-                if self.state == "F":
-                    self.restart_timer(self.timeout, self.follower_action)    
-            else:
-                if len(self.log) > request.prev_log_index:
-                    self.log = self.log[:request.prev_log_index]
-                if len(request.entries) != 0 :
-                    self.log.append(request.entries[0])
-                if request.leader_commit > self.commitIndex:
-                    self.commitIndex = min(request.leader_commit, len(self.log))
-                    while self.commitIndex > self.lastApplied:
-                        key, value = self.log[self.lastApplied].update.key, self.log[self.lastApplied].update.value
+                        key, value = self.log[self.lastApplied]["update"]["key"], self.log[self.lastApplied]["update"]["value"]
                         self.database[key] = value
                         self.lastApplied+=1
                             
@@ -325,7 +302,7 @@ class Handler(pb2_grpc.ServiceServicer, Server):
                 self.restart_timer(self.timeout, self.follower_action)
         else:  # Requester is in an earlier term
             reply = {"term": int(self.term), "result": False}
-        #print(reply)
+        
         return pb2.TermResultMessage(**reply)
 
     def Suspend(self, request, context):
