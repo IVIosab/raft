@@ -23,6 +23,12 @@ class Server:
         self.timer = Timer(10, self.start)
         self.threads = []
         self.votes = []
+        self.commitIndex = 0
+        self.lastApplied = 0 
+        self.database = {}
+        self.log = []
+        self.nextIndex = []
+        self.matchIndex = []
         self.start()
     
     def start(self):
@@ -110,6 +116,8 @@ class Server:
         self.update_state("L")
         print(f'I am a leader, Term: {self.term}')
         self.leaderid = self.id
+        self.nextIndex = [(len(self.log)+1) for i in SERVERS_INFO]
+        self.matchIndex = [0 for i in SERVERS_INFO]  
         self.leader_action()
         
     def leader_action(self):
@@ -122,7 +130,30 @@ class Server:
             self.threads.append(Thread(target=self.heartbeat, args=(k, v))) 
         for t in self.threads:
             t.start()
-        self.restart_timer(self.timeout, self.leader_action)
+        self.restart_timer(self.timeout, self.leader_check)
+        
+    def leader_check(self):
+        if self.sleep or self.state!="L":
+            return
+        for t in self.threads:
+            t.join(0)
+
+        self.nextIndex[ID] = len(self.log)+1
+        self.matchIndex[ID] = len(self.log)
+
+        commits = 0
+        for element in self.matchIndex:
+            if element >= self.commitIndex+1:
+                commits += 1
+        
+        if commits > int(len(self.matchIndex)//2):
+            self.commitIndex += 1
+        while self.commitIndex>self.lastApplied:
+            key, value = self.log[self.lastApplied]["update"]["key"], self.log[self.lastApplied]["update"]["value"]
+            self.database[key] = value
+            self.lastApplied+=1
+            
+        self.leader_action()
         
         
     def request(self, id, address):  
@@ -131,7 +162,7 @@ class Server:
         
         channel = grpc.insecure_channel(address)
         stub = pb2_grpc.ServiceStub(channel)
-        message = pb2.TermIdMessage(term=int(self.term), id=int(self.id))
+        message = pb2.RequestTermIdMessage(term=int(self.term), id=int(self.id), last_log_index=len(self.log), last_log_term=(0 if len(self.log)==0 else self.log[-1]["term"]))
         try:
             response = stub.RequestVote(message)
             reciever_term = response.term
@@ -151,7 +182,16 @@ class Server:
         
         channel = grpc.insecure_channel(address)
         stub = pb2_grpc.ServiceStub(channel)
-        message = pb2.TermIdMessage(term=int(self.term), id=int(self.id))
+
+        entries = []
+        if self.nextIndex[id]<=len(self.log):
+            entries = [self.log[self.nextIndex[id]-1]]
+        
+        prev_log_term = 0
+        if self.nextIndex[id] > 1:
+            prev_log_term = self.log[self.nextIndex[id]-2]["term"]
+
+        message = pb2.AppendTermIdMessage(term=int(self.term), id=int(self.id), prev_log_index=self.nextIndex[id]-1, prev_log_term=prev_log_term, entries=entries, leader_commit=self.commitIndex)
         
         try: 
             response = stub.AppendEntries(message)
@@ -161,6 +201,14 @@ class Server:
                 self.update_term(reciever_term)
                 self.set_timeout()
                 self.follower_declaration()
+            else:
+                if reciever_result:
+                    if len(entries) != 0:
+                        self.matchIndex[id] = self.nextIndex[id]
+                        self.nextIndex[id] += 1
+                else:
+                    self.nextIndex[id] -= 1
+                    self.matchIndex[id] = min(self.matchIndex[id], (self.nextIndex[id]-1))
         except grpc.RpcError:
             return
 
@@ -186,29 +234,38 @@ class Handler(pb2_grpc.ServiceServicer, Server):
             context.set_details("Server suspended")
             context.set_code(grpc.StatusCode.UNAVAILABLE)
             return pb2.TermResultMessage()
-        candidate_term = request.term
-        candidate_id = request.id
         reply = {"term": -1, "result": False}
         
-        if candidate_term == self.term:  # In the same term as me, we both are or were candidates
+        if request.term == self.term:  # In the same term as me, we both are or were candidates
             if self.state == "F":
                 if not self.voted:
-                    self.voted = True
-                    self.leaderid = candidate_id
-                    print(f'Voted for node {candidate_id}')
-                    reply = {"term": int(self.term), "result": True}
+                    if request.last_log_index > len(self.log):
+                        self.voted = True
+                        self.leaderid = request.id
+                        print(f'Voted for node {request.id}')
+                        reply = {"term": int(self.term), "result": True}
+                    elif request.last_log_index == len(self.log):
+                        if self.log[request.last_log_index-1]["term"] == request.last_log_term:
+                            self.voted = True
+                            self.leaderid = request.id
+                            print(f'Voted for node {request.id}')
+                            reply = {"term": int(self.term), "result": True}
+                        else:
+                            reply = {"term": int(self.term), "result": False}    
+                    else:
+                        reply = {"term": int(self.term), "result": False}
                 else:
                     reply = {"term": int(self.term), "result": False}
                 self.restart_timer(self.timeout, self.follower_action)    
             else:
                 reply = {"term": int(self.term), "result": False}
-        elif candidate_term > self.term:  # I am in an earlier term
-            self.update_term(candidate_term)
-            self.leaderid = candidate_id 
+        elif request.term > self.term:  # I am in an earlier term
+            self.update_term(request.term)
+            print(f'Voted for node {request.id}')
+            self.leaderid = request.id 
             self.voted = True 
-            print(f'Voted for node {candidate_id}')
-            reply = {"term": int(self.term), "result": True}
             self.follower_declaration()
+            reply = {"term": int(self.term), "result": True}
         else:  # Candidate is in an earlier term
             reply = {"term": int(self.term), "result": False}
             if self.state == "F":
@@ -221,21 +278,54 @@ class Handler(pb2_grpc.ServiceServicer, Server):
             context.set_details("Server suspended")
             context.set_code(grpc.StatusCode.UNAVAILABLE)
             return pb2.TermResultMessage()
-        leader_term = request.term
-        leader_id = request.id
         reply = {"term": -1, "result": False}
-        
-        if leader_term >= self.term:
-            self.update_term(leader_term)
-            self.leaderid = leader_id
-            reply = {"term": int(self.term), "result": True}
+        if request.term == self.term:
+            if len(self.log) < request.prev_log_index:
+                #print("Test")
+                reply = {"term": int(self.term), "result": False}
+                if self.state == "F":
+                    self.restart_timer(self.timeout, self.follower_action)    
+            else:
+                if len(self.log) > request.prev_log_index:
+                    self.log = self.log[:request.prev_log_index]
+                if len(request.entries) != 0 :
+                    self.log.append(request.entries[0])
+                if request.leader_commit > self.commitIndex:
+                    self.commitIndex = min(request.leader_commit, len(self.log))
+                    while self.commitIndex > self.lastApplied:
+                        key, value = self.log[self.lastApplied].update.key, self.log[self.lastApplied].update.value
+                        self.database[key] = value
+                        self.lastApplied+=1
+                            
+                reply = {"term": int(self.term), "result": True}    
+                self.restart_timer(self.timeout, self.follower_action)
+
+        elif request.term > self.term:
+            self.update_term(request.term)
             self.follower_declaration
+            self.leaderid = request.id
+            if len(self.log) < request.prev_log_index:
+                #print("Test")
+                reply = {"term": int(self.term), "result": False}
+                if self.state == "F":
+                    self.restart_timer(self.timeout, self.follower_action)    
+            else:
+                if len(self.log) > request.prev_log_index:
+                    self.log = self.log[:request.prev_log_index]
+                if len(request.entries) != 0 :
+                    self.log.append(request.entries[0])
+                if request.leader_commit > self.commitIndex:
+                    self.commitIndex = min(request.leader_commit, len(self.log))
+                    while self.commitIndex > self.lastApplied:
+                        key, value = self.log[self.lastApplied].update.key, self.log[self.lastApplied].update.value
+                        self.database[key] = value
+                        self.lastApplied+=1
+                            
+                reply = {"term": int(self.term), "result": True}    
+                self.restart_timer(self.timeout, self.follower_action)
         else:  # Requester is in an earlier term
             reply = {"term": int(self.term), "result": False}
-        
-        if self.state == "F":
-            self.restart_timer(self.timeout, self.follower_action)
-        
+        #print(reply)
         return pb2.TermResultMessage(**reply)
 
     def Suspend(self, request, context):
@@ -268,6 +358,38 @@ class Handler(pb2_grpc.ServiceServicer, Server):
             reply = {}
             
         return pb2.LeaderMessage(**reply)
+
+    def SetVal(self, request, context):
+        if self.sleep:
+            context.set_details("Server suspended")
+            context.set_code(grpc.StatusCode.UNAVAILABLE)
+            return pb2.SuccessMessage
+        reply = {"success": False}
+        
+        if self.state == "L":
+            self.log.append({"term": self.term, "update": {"command": 'set', "key": request.key, "value": request.value}})
+            reply = {"success": True}
+        elif self.state == "F":
+            channel = grpc.insecure_channel(f'{SERVERS_INFO[self.leaderid]}')
+            stub = pb2_grpc.ServiceStub(channel)
+            message = pb2.KeyValMessage(key=request.key, value=request.value)
+            try:
+                response = stub.SetVal(message)
+                reply = {"success": response.success}
+            except grpc.RpcError:
+                print("Server is not avaliable")
+        return pb2.SuccessMessage(**reply)
+
+
+    def GetVal(self, request, context):
+        if self.sleep:
+            context.set_details("Server suspended")
+            context.set_code(grpc.StatusCode.UNAVAILABLE)
+            return pb2.SuccessValMessage
+        reply = {"success": False, "value": "None"}
+        if request.key in self.database:
+            reply = {"success": True, "value": self.database[request.key]}
+        return pb2.SuccessValMessage(**reply)
 
 
 def serve():
