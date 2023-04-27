@@ -63,16 +63,17 @@ It follows the following schema: `[id] [address] [port]`
 Then you can run multiple servers in different terminals, for example:
 
 ```
-TODO
+gnome-terminal --window -x python3 client.py & gnome-terminal --window -x python3 server.py 0 & gnome-terminal --window -x python3 server.py 1 & gnome-terminal --window -x python3 server.py 2
 ```
 
-Each server terminal will print updates regarding its state `[Follower, Candidate, Leader]`
+This command will run the client and 3 servers with ids 0, 1, 2. in different terminal windows.
 
-To test the Log replication functionality you will need to run `client.py` and interact with nodes using the following commands: `[connect, getleader, suspend, quit, getval, setval]`, for example:
-
-```
-TODO
-```
+Then you can use the client terminal to run commands such as: `[getleader, suspend, quit, getval, setval]` Where:
+`getleader`: returns the current leader id and address
+`suspend`: takes one integer as an argument and suspends a server for that amount of time (in seconds)
+`quit`: terminates the client
+`getval`: takes one string as an argument and returns the value of the key with that key
+`setval`: takes a string and an integer as arguments and sets the value of the first key to the second value
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 

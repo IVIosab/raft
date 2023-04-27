@@ -54,6 +54,7 @@ class Server:
         """
         if self.sleep:
             return
+
         self.timeout = random.uniform(0.150, 0.300)
 
     def restart_timer(self, time, func):
@@ -75,6 +76,7 @@ class Server:
         """
         if self.sleep:
             return
+
         self.state = state
         print(f'Term: {self.term}\t State: {self.state}')
 
@@ -86,10 +88,11 @@ class Server:
         """
         if self.sleep:
             return
+
         self.voted = False
         self.term = term
         print(
-            f'\n-+-+-+-+-+-+-+-+-+-+-+- Term: {self.term} -+-+-+-+-+-+-+-+-+-+-+-\n')
+            f'\n-+-+-+-+-+- Term: {self.term} -+-+-+-+-+-\n')
 
     def follower_declaration(self):
         """
@@ -97,6 +100,7 @@ class Server:
         """
         if self.sleep:
             return
+
         self.update_state("Follower")
         self.restart_timer(self.timeout, self.follower_action)
 
@@ -106,6 +110,7 @@ class Server:
         """
         if self.sleep or self.state != "Follower":
             return
+
         print(f'Term: {self.term}\t Leader is dead')
         self.leaderid = -1
         self.candidate_declaration()
@@ -116,11 +121,14 @@ class Server:
         """
         if self.sleep:
             return
+
         self.update_term(self.term+1)
         self.update_state("Candidate")
         self.voted = True
         self.leaderid = self.id
+
         print(f'Term: {self.term}\t Voted_For: {self.id}')
+
         self.restart_timer(self.timeout, self.candidate_action)
         self.candidate_election()
 
@@ -130,6 +138,7 @@ class Server:
         """
         if self.sleep or self.state != "Candidate":
             return
+
         self.votes = [0 for _ in range(len(SERVERS_INFO))]
         self.threads = []
         for k, v in SERVERS_INFO.items():
@@ -146,6 +155,7 @@ class Server:
         """
         if self.sleep or self.state != "Candidate":
             return
+
         for t in self.threads:
             t.join(0)
 
@@ -165,18 +175,22 @@ class Server:
         """
         if self.sleep:
             return
+
         self.update_state("Leader")
         self.leaderid = self.id
+
         self.nextIndex = [(len(self.log)+1) for i in SERVERS_INFO]
         self.matchIndex = [0 for i in SERVERS_INFO]
+
         self.leader_action()
 
     def leader_action(self):
         """
-        Perform the leader's action.
+        Sends heartbeats to followers.
         """
         if self.sleep or self.state != "Leader":
             return
+
         self.threads = []
         for k, v in SERVERS_INFO.items():
             if k == ID:
@@ -184,37 +198,41 @@ class Server:
             self.threads.append(Thread(target=self.heartbeat, args=(k, v)))
         for t in self.threads:
             t.start()
+
         self.restart_timer(self.timeout, self.leader_check)
 
     def leader_check(self):
         """
-
+        Checks the database for commits and updates accordingly.
         """
         if self.sleep or self.state != "Leader":
             return
+
         for t in self.threads:
             t.join(0)
 
         self.nextIndex[ID] = len(self.log)+1
         self.matchIndex[ID] = len(self.log)
 
-        commits = 0
-        for element in self.matchIndex:
-            if element >= self.commitIndex+1:
-                commits += 1
+        commits = sum(
+            1 for element in self.matchIndex if element >= self.commitIndex+1)
 
         if commits > int(len(self.matchIndex)//2):
             self.commitIndex += 1
         while self.commitIndex > self.lastApplied:
             key, value = self.log[self.lastApplied]["update"]["key"], self.log[self.lastApplied]["update"]["value"]
             self.database[key] = value
+            print(f'Term: {self.term}\t {key} = {value}')
             self.lastApplied += 1
 
         self.leader_action()
 
     def request(self, id, address):
         """
+        Sends a requestVote to a server.
 
+        :param id: An integer representing the id of the server.
+        :param address: A string representing the address of the server.
         """
         if self.sleep or self.state != "Candidate":
             return
@@ -238,7 +256,10 @@ class Server:
 
     def heartbeat(self, id, address):
         """
+        Sends a heartbeat to a server.
 
+        :param id: The id of the server to send the heartbeat to.
+        :param address: The address of the server to send the heartbeat to.
         """
         if self.sleep or (self.state != "Leader"):
             return
@@ -279,22 +300,20 @@ class Server:
 
     def gotosleep(self, period):
         """
+        Method to suspend the server for a given period of time.
 
+        :param period: The period of time in seconds to suspend the server for.
         """
         self.sleep = True
+        print(f'Term: {self.term}\t Sleeping for {period} seconds')
         self.restart_timer(int(period), self.wakeup)
 
     def wakeup(self):
         """
-
+        Method to wake up the server after being suspended.
         """
         self.sleep = False
-        if self.state == "Leader":
-            self.leader_action()
-        elif self.state == "Candidate":
-            self.candidate_action()
-        else:
-            self.follower_action()
+        self.follower_declaration()
 
 
 class Handler(pb2_grpc.ServiceServicer, Server):
@@ -303,12 +322,16 @@ class Handler(pb2_grpc.ServiceServicer, Server):
 
     def RequestVote(self, request, context):
         """
+        Method to handle a requestVote from a server.
 
+        :param request: A RequestTermIdMessage object containing the term, id, last_log_index and last_log_term of the server.
+        :param context: The context of the request.
         """
         if self.sleep:
             context.set_details("Server suspended")
             context.set_code(grpc.StatusCode.UNAVAILABLE)
             return pb2.TermResultMessage()
+
         reply = {"term": -1, "result": False}
 
         if request.term == self.term:  # In the same term as me, we both are or were candidates
@@ -343,7 +366,10 @@ class Handler(pb2_grpc.ServiceServicer, Server):
 
     def AppendEntries(self, request, context):
         """
+        Method to handle an appendEntries from a server.
 
+        :param request: An AppendTermIdMessage object containing the term, id, prev_log_index, prev_log_term, entries and leader_commit of the server.
+        :param context: The context of the request.
         """
         if self.sleep:
             context.set_details("Server suspended")
@@ -354,7 +380,7 @@ class Handler(pb2_grpc.ServiceServicer, Server):
         if request.term >= self.term:
             if request.term > self.term:
                 self.update_term(request.term)
-                self.follower_declaration
+                self.follower_declaration()
                 self.leaderid = request.id
 
             if len(self.log) < request.prev_log_index:
@@ -376,6 +402,7 @@ class Handler(pb2_grpc.ServiceServicer, Server):
                     while self.commitIndex > self.lastApplied:
                         key, value = self.log[self.lastApplied]["update"]["key"], self.log[self.lastApplied]["update"]["value"]
                         self.database[key] = value
+                        print(f'Term: {self.term}\t {key} = {value}')
                         self.lastApplied += 1
 
                 reply = {"term": int(self.term), "result": True}
@@ -387,50 +414,58 @@ class Handler(pb2_grpc.ServiceServicer, Server):
 
     def Suspend(self, request, context):
         """
+        Method to handle a suspend request from a server.
 
+        :param request: An EmptyMessage object.
+        :param context: The context of the request.
         """
         if self.sleep:
             context.set_details("Server suspended")
             context.set_code(grpc.StatusCode.UNAVAILABLE)
             return pb2.EmptyMessage()
+
         period = request.period
-
-        print(f'Command from client: suspend {period}')
-        self.gotosleep(period)
-        print(f'Sleeping for {period} seconds')
-
         reply = {}
+
+        print(f'Term: {self.term}\t Command: suspend {period}')
+        self.gotosleep(period)
+
         return pb2.EmptyMessage(**reply)
 
     def GetLeader(self, request, context):
         """
+        Method to handle a getleader request from a server.
 
+        :param request: An EmptyMessage object.
+        :param context: The context of the request.
         """
         if self.sleep:
             context.set_details("Server suspended")
             context.set_code(grpc.StatusCode.UNAVAILABLE)
             return pb2.LeaderMessage()
+
         reply = {"leader": -1, "address": ""}
 
-        print(f'Command from client: getleader')
+        print(f'Term: {self.term}\t Command: getleader')
 
         if self.leaderid != -1:  # I have a leader
             reply = {"leader": int(self.leaderid),
                      "address": SERVERS_INFO[self.leaderid]}
-            print(f'{int(self.leaderid)} {SERVERS_INFO[self.leaderid]}')
-        else:  # I do not have a leader
-            reply = {}
 
         return pb2.LeaderMessage(**reply)
 
     def SetVal(self, request, context):
         """
+        Method to handle a setval request from a server.
 
+        :param request: A KeyValMessage object containing the key and value to be set.
+        :param context: The context of the request.
         """
         if self.sleep:
             context.set_details("Server suspended")
             context.set_code(grpc.StatusCode.UNAVAILABLE)
             return pb2.SuccessMessage
+
         reply = {"success": False}
 
         if self.state == "Leader":
@@ -446,29 +481,54 @@ class Handler(pb2_grpc.ServiceServicer, Server):
                 reply = {"success": response.success}
             except grpc.RpcError:
                 print("Server is not avaliable")
+
         return pb2.SuccessMessage(**reply)
 
     def GetVal(self, request, context):
         """
+        Method to handle a getval request from a server.
 
+        :param request: A KeyMessage object containing the key to be retrieved.
+        :param context: The context of the request.
         """
         if self.sleep:
             context.set_details("Server suspended")
             context.set_code(grpc.StatusCode.UNAVAILABLE)
             return pb2.SuccessValMessage
+
         reply = {"success": False, "value": "None"}
+
         if request.key in self.database:
             reply = {"success": True, "value": self.database[request.key]}
+
         return pb2.SuccessValMessage(**reply)
+
+    def GetStatus(self, request, context):
+        """
+        Method to handle a getstatus request from a server.
+
+        :param request: An EmptyMessage object.
+        :param context: The context of the request.
+        """
+        if self.sleep:
+            context.set_details("Server suspended")
+            context.set_code(grpc.StatusCode.UNAVAILABLE)
+            return pb2.EmptyMessage()
+
+        reply = {}
+
+        print(f'Term: {self.term}\t Command: getStatus')
+
+        return pb2.EmptyMessage(**reply)
 
 
 def serve():
     """
-
+    Method to start the server.
     """
     print(f'Server ID: {ID}')
     print(f'Server Address: {SERVERS_INFO[ID]}')
-    print(f'=======================================================\n')
+    print(f'================================\n')
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
     pb2_grpc.add_ServiceServicer_to_server(Handler(), server)
     server.add_insecure_port(SERVERS_INFO[ID])
@@ -486,7 +546,7 @@ def serve():
 
 def configuration():
     """
-    Setup configuration of servers based on Config.conf file
+    Setup configuration of servers based on Config.conf
     """
     with open('Config.conf') as f:
         global SERVERS_INFO

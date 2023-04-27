@@ -3,19 +3,27 @@ import grpc
 import raft_pb2 as pb2
 import raft_pb2_grpc as pb2_grpc
 
+SERVERS_INFO = {}
 SERVER_ADDRESS = -1
 SERVER_PORT = -1
 
 
-def connect(address, port):
-    global SERVER_ADDRESS, SERVER_PORT
-    SERVER_ADDRESS = address
-    SERVER_PORT = port
+def connect():
+    for id, address in SERVERS_INFO.items():
+        channel = grpc.insecure_channel(address)
+        stub = pb2_grpc.ServiceStub(channel)
+        message = pb2.EmptyMessage()
+        try:
+            _ = stub.GetStatus(message)
+            print(f'Connected to server {id}\n')
+            return stub
+        except:
+            pass
+    print("No servers are available\n")
 
 
 def get_leader():
-    channel = grpc.insecure_channel(f'{SERVER_ADDRESS}:{SERVER_PORT}')
-    stub = pb2_grpc.ServiceStub(channel)
+    stub = connect()
     message = pb2.EmptyMessage()
 
     try:
@@ -23,7 +31,7 @@ def get_leader():
         if response:
             leader = response.leader
             leader_address = response.address
-            print(f'{leader} {leader_address}')
+            print(f'ID: {leader}\t Address: {leader_address}')
         else:
             print(f'Nothing\n')
     except grpc.RpcError:
@@ -31,8 +39,7 @@ def get_leader():
 
 
 def suspend(period):
-    channel = grpc.insecure_channel(f'{SERVER_ADDRESS}:{SERVER_PORT}')
-    stub = pb2_grpc.ServiceStub(channel)
+    stub = connect()
     message = pb2.PeriodMessage(period=period)
 
     try:
@@ -42,20 +49,18 @@ def suspend(period):
 
 
 def getVal(key):
-    channel = grpc.insecure_channel(f'{SERVER_ADDRESS}:{SERVER_PORT}')
-    stub = pb2_grpc.ServiceStub(channel)
+    stub = connect()
     message = pb2.KeyMessage(key=key)
 
     try:
         response = stub.GetVal(message)
-        print(response.value)
+        print(f'{key} = {response.value}')
     except grpc.RpcError:
         print("Server is not avaliable\n")
 
 
 def setVal(key, value):
-    channel = grpc.insecure_channel(f'{SERVER_ADDRESS}:{SERVER_PORT}')
-    stub = pb2_grpc.ServiceStub(channel)
+    stub = connect()
     message = pb2.KeyValMessage(key=key, value=value)
 
     try:
@@ -94,11 +99,7 @@ def client():
             command = input_buffer.split()[0]  # command type
             command_args = input_buffer.split()[1:]  # command arguments
 
-            if command == "connect":
-                if check(2, len(command_args)):
-                    continue
-                connect(str(command_args[0]), str(command_args[1]))
-            elif command == "getleader":
+            if command == "getleader":
                 if check(0, len(command_args)):
                     continue
                 get_leader()
@@ -124,5 +125,19 @@ def client():
             return
 
 
+def configuration():
+    """
+    Setup configuration of servers based on Config.conf
+    """
+    with open('Config.conf') as f:
+        global SERVERS_INFO
+        lines = f.readlines()
+        for line in lines:
+            parts = line.split()
+            id, address, port = parts[0], parts[1], parts[2]
+            SERVERS_INFO[int(id)] = (f'{str(address)}:{str(port)}')
+
+
 if __name__ == "__main__":
+    configuration()
     client()

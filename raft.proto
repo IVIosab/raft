@@ -1,71 +1,66 @@
 syntax = "proto3";
 
-service Service{
-    rpc RequestVote(RequestTermIdMessage) returns (TermResultMessage);
-    rpc AppendEntries(AppendTermIdMessage) returns (TermResultMessage);
-    rpc Suspend(PeriodMessage) returns (EmptyMessage);
-    rpc GetLeader(EmptyMessage) returns (LeaderMessage);
-    rpc SetVal(KeyValMessage) returns (SuccessMessage);
-    rpc GetVal(KeyMessage) returns (SuccessValMessage);
+service Service {
+  rpc RequestVote(RequestTermIdMessage) returns (TermResultMessage);
+  rpc AppendEntries(AppendTermIdMessage) returns (TermResultMessage);
+  rpc Suspend(PeriodMessage) returns (EmptyMessage);
+  rpc GetLeader(EmptyMessage) returns (LeaderMessage);
+  rpc SetVal(KeyValMessage) returns (SuccessMessage);
+  rpc GetVal(KeyMessage) returns (SuccessValMessage);
+  rpc GetStatus(EmptyMessage) returns (EmptyMessage);
 }
 
-message KeyValMessage{
-    string key = 1;
-    string value = 2;
+message KeyValMessage {
+  string key = 1;
+  string value = 2;
 }
 
-message SuccessMessage{
-    bool success = 1;
+message SuccessMessage { bool success = 1; }
+
+message KeyMessage { string key = 1; }
+
+message SuccessValMessage {
+  bool success = 1;
+  string value = 2;
 }
 
-message KeyMessage{
-    string key = 1;
+message RequestTermIdMessage {
+  int32 term = 1;
+  int32 id = 2;
+  int32 last_log_index = 3;
+  int32 last_log_term = 4;
 }
 
-message SuccessValMessage{
-    bool success = 1;
-    string value = 2;
+message Update {
+  string command = 1;
+  string key = 2;
+  string value = 3;
 }
 
-message RequestTermIdMessage{
-    int32 term = 1;
-    int32 id = 2;
-    int32 last_log_index = 3;
-    int32 last_log_term = 4;
+message Entry {
+  int32 term = 1;
+  Update update = 2;
 }
 
-message Update{
-    string command = 1;
-    string key = 2;
-    string value = 3;
+message AppendTermIdMessage {
+  int32 term = 1;
+  int32 id = 2;
+  int32 prev_log_index = 3;
+  int32 prev_log_term = 4;
+  repeated Entry entries = 5;
+  int32 leader_commit = 6;
 }
 
-message Entry{
-    int32 term = 1;
-    Update update = 2;
+message TermResultMessage {
+  int32 term = 1;
+  bool result = 2;
 }
 
-message AppendTermIdMessage{
-    int32 term = 1;
-    int32 id = 2;
-    int32 prev_log_index = 3;
-    int32 prev_log_term = 4;
-    repeated Entry entries = 5;
-    int32 leader_commit = 6;
-}
+message PeriodMessage { int32 period = 1; }
 
-message TermResultMessage{
-    int32 term = 1;
-    bool result = 2;
-}
+message EmptyMessage {}
 
-message PeriodMessage{
-    int32 period = 1;
-}
-
-message EmptyMessage{}
-
-message LeaderMessage{
-    int32 leader = 1;
-    string address = 2;
+message LeaderMessage {
+  int32 leader = 1;
+  string address = 2;
 }
