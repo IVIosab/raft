@@ -1,1 +1,2 @@
-TODO
+grpcio
+grpcio-tools
